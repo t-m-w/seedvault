@@ -32,6 +32,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -331,7 +332,7 @@ internal class BackupCoordinatorTest : BackupTest() {
             backup.checkFullBackupSize(DEFAULT_QUOTA_FULL_BACKUP + 1)
         )
         backup.cancelFullBackup()
-        assertEquals(0L, backup.requestFullBackupTime())
+        ensureFullBackupNotReadyToSystem()
 
         verify(exactly = 1) {
             metadataManager.onPackageBackupError(
@@ -343,6 +344,18 @@ internal class BackupCoordinatorTest : BackupTest() {
         }
         verify { metadataOutputStream.close() }
     }
+
+    private fun ensureFullBackupNotReadyToSystem() {
+        // Full backups are internally-scheduled, so it is never a good time for the system
+        // to initiate one.
+        assertNotEquals(0L, backup.requestFullBackupTime())
+    }
+
+    @Test
+    fun `requestFullBackupTime is never ready because full backups are internally-scheduled`() =
+        runBlocking {
+            ensureFullBackupNotReadyToSystem()
+        }
 
     @Test
     fun `app with no data gets cancelled and reason written to metadata`() = runBlocking {
@@ -377,7 +390,7 @@ internal class BackupCoordinatorTest : BackupTest() {
         )
         assertEquals(TRANSPORT_PACKAGE_REJECTED, backup.checkFullBackupSize(0))
         backup.cancelFullBackup()
-        assertEquals(0L, backup.requestFullBackupTime())
+        ensureFullBackupNotReadyToSystem()
 
         verify(exactly = 1) {
             metadataManager.onPackageBackupError(

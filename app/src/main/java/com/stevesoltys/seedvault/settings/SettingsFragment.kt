@@ -117,7 +117,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         backupStorage.onPreferenceChangeListener = OnPreferenceChangeListener { _, newValue ->
             val disable = !(newValue as Boolean)
             if (disable) {
-                viewModel.disableStorageBackup()
+                viewModel.updateBackupJob()
                 return@OnPreferenceChangeListener true
             }
             onEnablingStorageBackup()
@@ -239,7 +239,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     Toast.makeText(context, R.string.settings_backup_storage_battery_optimization,
                         LENGTH_LONG).show()
                 }
-                viewModel.enableStorageBackup()
+                viewModel.updateBackupJob()
                 backupStorage.isChecked = true
                 dialog.dismiss()
             }

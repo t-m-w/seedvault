@@ -28,6 +28,7 @@ import com.stevesoltys.seedvault.R
 import com.stevesoltys.seedvault.crypto.KeyManager
 import com.stevesoltys.seedvault.metadata.MetadataManager
 import com.stevesoltys.seedvault.permitDiskReads
+import com.stevesoltys.seedvault.storage.AppDataBackupJobService
 import com.stevesoltys.seedvault.storage.StorageBackupJobService
 import com.stevesoltys.seedvault.storage.StorageBackupService
 import com.stevesoltys.seedvault.storage.StorageBackupService.Companion.EXTRA_START_APP_BACKUP
@@ -137,13 +138,7 @@ internal class SettingsViewModel(
             networkCallback.registered = true
         }
 
-        if (settingsManager.isStorageBackupEnabled()) {
-            // disable storage backup if new storage is on USB
-            if (storage.isUsb) disableStorageBackup()
-            // enable it, just in case the previous storage was on USB,
-            // also to update the network requirement of the new storage
-            else enableStorageBackup()
-        }
+        updateBackupJob()
 
         viewModelScope.launch(Dispatchers.IO) {
             val canDo = settingsManager.canDoBackupNow()
@@ -220,21 +215,37 @@ internal class SettingsViewModel(
         return keyManager.hasMainKey()
     }
 
-    fun enableStorageBackup() {
-        val storage = settingsManager.getStorage() ?: error("no storage available")
-        if (!storage.isUsb) BackupJobService.scheduleJob(
+    /**
+     * Establish or cancel a scheduled backup job.
+     *
+     * We handle our own full backup scheduling. If storage backup is not enabled, a job will be
+     * scheduled to request a backup under the same conditions used for storage backup.
+     */
+    fun updateBackupJob() {
+        val storage = settingsManager.getStorage()
+
+        // disable storage backup job if new storage is on USB
+        val shouldUseStorageBackupJob =
+            settingsManager.isStorageBackupEnabled() && storage?.isUsb == false
+
+        val jobServiceClass = if (shouldUseStorageBackupJob) {
+            StorageBackupJobService::class.java
+        } else if (backupManager.isBackupEnabled) {
+            AppDataBackupJobService::class.java
+        } else {
+            BackupJobService.cancelJob(app)
+            return
+        }
+
+        BackupJobService.scheduleJob(
             context = app,
-            jobServiceClass = StorageBackupJobService::class.java,
+            jobServiceClass = jobServiceClass,
             periodMillis = HOURS.toMillis(24),
-            networkType = if (storage.requiresNetwork) NETWORK_TYPE_UNMETERED
+            networkType = if (storage?.requiresNetwork == true) NETWORK_TYPE_UNMETERED
             else NETWORK_TYPE_NONE,
             deviceIdle = false,
             charging = true
         )
-    }
-
-    fun disableStorageBackup() {
-        BackupJobService.cancelJob(app)
     }
 
     fun onLogcatUriReceived(uri: Uri?) = viewModelScope.launch(Dispatchers.IO) {

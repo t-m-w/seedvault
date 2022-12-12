@@ -1,7 +1,12 @@
 package com.stevesoltys.seedvault.storage
 
+import android.app.Service
 import android.content.Intent
+import android.os.IBinder
+import android.util.Log
 import com.stevesoltys.seedvault.transport.requestBackup
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.calyxos.backup.storage.api.BackupObserver
 import org.calyxos.backup.storage.api.RestoreObserver
 import org.calyxos.backup.storage.api.StorageBackup
@@ -51,5 +56,32 @@ internal class StorageRestoreService : RestoreService() {
     // use lazy delegate because context isn't available during construction time
     override val restoreObserver: RestoreObserver by lazy {
         NotificationRestoreObserver(applicationContext)
+    }
+}
+
+// TODO: Refactor this to be outside of the storage backup package
+internal class AppDataBackupJobService : BackupJobService(AppDataBackupService::class.java)
+
+internal class AppDataBackupService : Service() {
+    companion object {
+        private const val TAG = "AppDataBackupService"
+    }
+
+    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand $intent $flags $startId")
+        GlobalScope.launch {
+            requestBackup(applicationContext)
+            stopSelf(startId)
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
+    }
+
+    override fun onDestroy() {
+        Log.d(TAG, "onDestroy")
+        super.onDestroy()
     }
 }

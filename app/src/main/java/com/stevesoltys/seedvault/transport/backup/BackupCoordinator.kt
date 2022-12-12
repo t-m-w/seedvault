@@ -266,8 +266,11 @@ internal class BackupCoordinator(
      *
      * @see [requestBackupTime]
      */
-    fun requestFullBackupTime(): Long = getBackupBackoff().apply {
-        Log.i(TAG, "Request full backup time. Returned $this")
+    fun requestFullBackupTime(): Long {
+        // Back off of system-scheduled full backups. We handle our own scheduling
+        // to accommodate apps which are only eligible for device-to-device migrations.
+        Log.i(TAG, "Request full backup time. Scheduled internally instead, so postponing")
+        return DAYS.toMillis(30)
     }
 
     fun checkFullBackupSize(size: Long): Int {
